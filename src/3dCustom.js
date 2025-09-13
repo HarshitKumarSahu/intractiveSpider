@@ -49,12 +49,14 @@
             walkRadius: 50,
             noiseScale: 2,
             spiderRadius: 100,
+            movementSpeed: 35,
             reset: () => {
                 config.spiderCount = 2;
                 config.particleCount = 333;
                 config.walkRadius = 50;
                 config.noiseScale = 2;
                 config.spiderRadius = 100;
+                config.movementSpeed = 35;
                 restartAnimation();
                 gui.updateDisplay();
             }
@@ -137,8 +139,8 @@
                     const selfMoveY = sin(t * ky + seed) * walkRadius.y;
                     let fx = tx + selfMoveX;
                     let fy = ty + selfMoveY;
-                    x += min(window.innerWidth / 100, (fx - x) / 10);
-                    y += min(window.innerWidth / 100, (fy - y) / 10);
+                    x += min(window.innerWidth / 100, (fx - x) / config.movementSpeed);
+                    y += min(window.innerWidth / 100, (fy - y) / config.movementSpeed);
 
                     let i = 0;
                     pts.forEach((pt) => {
@@ -170,6 +172,7 @@
         gui.add(config, 'walkRadius', 10, 200, 1).name('Walk Radius').onChange(restartAnimation);
         gui.add(config, 'noiseScale', 0, 10, 0.1).name('Line Noise').onChange(restartAnimation);
         gui.add(config, 'spiderRadius', 50, 200, 1).name('Spider Radius').onChange(restartAnimation);
+        gui.add(config, 'movementSpeed', 10, 100, 1).name('Movement Speed').onChange(restartAnimation);
         gui.add(config, 'reset').name('Reset Defaults');
 
         // Initialize spiders

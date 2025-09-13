@@ -57,8 +57,8 @@ function spawn() {
     let fx = tx + selfMoveX;         
     let fy = ty + selfMoveY; 
             
-    x += min(innerWidth/100, (fx - x)/10)
-    y += min(innerWidth/100, (fy - y)/10)
+    x += min(innerWidth/100, (fx - x)/ 35)
+    y += min(innerWidth/100, (fy - y)/ 35)
             
     let i = 0
     pts.forEach((pt) => {
