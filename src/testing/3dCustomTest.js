@@ -1,0 +1,233 @@
+// this is testing 1
+
+import * as THREE from 'three';
+import * as dat from 'dat.gui';
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(
+            window.innerWidth / -2,
+            window.innerWidth / 2,
+            window.innerHeight / 2,
+            window.innerHeight / -2,
+            0.1, 1000
+        );
+        camera.position.z = 100;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const { sin, cos, PI, hypot, min, max } = Math;
+
+        function rnd(x = 1, dx = 0) {
+            return Math.random() * x + dx;
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function noise(x, y, t = 101) {
+            let w0 = sin(0.3 * x + 1.4 * t + 2.0 + 
+                         2.5 * sin(0.4 * y + -1.3 * t + 1.0));
+            let w1 = sin(0.2 * y + 1.5 * t + 2.8 + 
+                         2.3 * sin(0.5 * x + -1.2 * t + 0.5));
+            return w0 + w1;
+        }
+
+        function pt(x, y) {
+            return { x, y };
+        }
+
+        function many(n, f) {
+            return [...Array(n)].map((_, i) => f(i));
+        }
+
+        // GUI Configuration
+        const config = {
+            spiderCount: 2,
+            particleCount: 333,
+            walkRadius: 50,
+            noiseScale: 2,
+            spiderRadius: 100,
+            movementSpeed: 35,
+            particleSize: 1,
+            lineColor: '#ffffff',
+            particleColor: '#ffffff',
+            lineOpacity: 1,
+            oscillationFreq: 0.8,
+            maxConnected: 8,
+            armCount: 9,
+            reset: () => {
+                config.spiderCount = 2;
+                config.particleCount = 333;
+                config.walkRadius = 50;
+                config.noiseScale = 2;
+                config.spiderRadius = 100;
+                config.movementSpeed = 35;
+                config.particleSize = 1;
+                config.lineColor = '#ffffff';
+                config.particleColor = '#ffffff';
+                config.lineOpacity = 1;
+                config.oscillationFreq = 0.8;
+                config.maxConnected = 8;
+                config.armCount = 9;
+                restartAnimation();
+                gui.updateDisplay();
+            }
+        };
+
+        let spiders = [];
+
+        function spawn() {
+            // Clear existing particles from scene
+            scene.children = scene.children.filter(child => !(child instanceof THREE.Mesh));
+
+            const pts = many(config.particleCount, () => ({
+                x: rnd(window.innerWidth) - window.innerWidth / 2,
+                y: rnd(window.innerHeight) - window.innerHeight / 2,
+                len: 0,
+                r: 0,
+                mesh: null
+            }));
+
+            const pts2 = many(config.armCount, (i) => ({
+                x: cos((i / config.armCount) * PI * 2),
+                y: sin((i / config.armCount) * PI * 2)
+            }));
+
+            const pointMaterial = new THREE.MeshBasicMaterial({ 
+                color: new THREE.Color(config.particleColor) 
+            });
+            const pointGeometry = new THREE.SphereGeometry(config.particleSize, 8, 8);
+            pts.forEach(pt => {
+                pt.mesh = new THREE.Mesh(pointGeometry, pointMaterial);
+                pt.mesh.position.set(pt.x, pt.y, 0);
+                scene.add(pt.mesh);
+            });
+
+            const lineMaterial = new THREE.LineBasicMaterial({ 
+                color: new THREE.Color(config.lineColor),
+                transparent: true,
+                opacity: config.lineOpacity
+            });
+            let seed = rnd(100);
+            let tx = rnd(window.innerWidth) - window.innerWidth / 2;
+            let ty = rnd(window.innerHeight) - window.innerHeight / 2;
+            let x = rnd(window.innerWidth) - window.innerWidth / 2;
+            let y = rnd(window.innerHeight) - window.innerHeight / 2;
+            let kx = rnd(config.oscillationFreq, config.oscillationFreq);
+            let ky = rnd(config.oscillationFreq, config.oscillationFreq);
+            let walkRadius = pt(rnd(config.walkRadius, config.walkRadius), rnd(config.walkRadius, config.walkRadius));
+            let r = window.innerWidth / config.spiderRadius;
+
+            function drawLine(x0, y0, x1, y1) {
+                const points = [];
+                many(100, (i) => {
+                    i = (i + 1) / 100;
+                    let px = lerp(x0, x1, i);
+                    let py = lerp(y0, y1, i);
+                    let k = noise(px / 5 + x0, py / 5 + y0) * config.noiseScale;
+                    points.push(new THREE.Vector3(px + k, py + k, 0));
+                });
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const line = new THREE.Line(geometry, lineMaterial);
+                scene.add(line);
+                return line;
+            }
+
+            function paintPt(pt) {
+                pts2.forEach((pt2) => {
+                    if (!pt.len) return;
+                    drawLine(
+                        lerp(x + pt2.x * r, pt.x, pt.len * pt.len),
+                        lerp(y + pt2.y * r, pt.y, pt.len * pt.len),
+                        x + pt2.x * r,
+                        y + pt2.y * r
+                    );
+                });
+                pt.mesh.scale.setScalar(pt.r);
+                pt.mesh.position.set(pt.x, pt.y, 0);
+            }
+
+            return {
+                follow(x, y) {
+                    tx = x - window.innerWidth / 2;
+                    ty = -y + window.innerHeight / 2;
+                },
+                tick(t) {
+                    const selfMoveX = cos(t * kx + seed) * walkRadius.x;
+                    const selfMoveY = sin(t * ky + seed) * walkRadius.y;
+                    let fx = tx + selfMoveX;
+                    let fy = ty + selfMoveY;
+                    x += min(window.innerWidth / 100, (fx - x) / config.movementSpeed);
+                    y += min(window.innerWidth / 100, (fy - y) / config.movementSpeed);
+
+                    let i = 0;
+                    pts.forEach((pt) => {
+                        const dx = pt.x - x;
+                        const dy = pt.y - y;
+                        const len = hypot(dx, dy);
+                        let r = min(2, window.innerWidth / len / 5);
+                        pt.t = 0;
+                        const increasing = len < window.innerWidth / 10 && i++ < config.maxConnected;
+                        let dir = increasing ? 0.1 : -0.1;
+                        if (increasing) r *= 1.5;
+                        pt.r = r;
+                        pt.len = max(0, min(pt.len + dir, 1));
+                        paintPt(pt);
+                    });
+                }
+            };
+        }
+
+        function restartAnimation() {
+            scene.children = scene.children.filter(child => !(child instanceof THREE.Mesh || child instanceof THREE.Line));
+            spiders = many(config.spiderCount, spawn);
+        }
+
+        // Initialize GUI
+        const gui = new dat.GUI();
+        gui.add(config, 'spiderCount', 1, 10, 1).name('Spider Count').onChange(restartAnimation);
+        gui.add(config, 'particleCount', 100, 1000, 1).name('Particle Count').onChange(restartAnimation);
+        gui.add(config, 'walkRadius', 10, 200, 1).name('Walk Radius').onChange(restartAnimation);
+        gui.add(config, 'noiseScale', 0, 10, 0.1).name('Line Noise').onChange(restartAnimation);
+        gui.add(config, 'spiderRadius', 50, 200, 1).name('Spider Radius').onChange(restartAnimation);
+        gui.add(config, 'movementSpeed', 10, 100, 1).name('Movement Speed').onChange(restartAnimation);
+        gui.add(config, 'particleSize', 0.5, 5, 0.1).name('Particle Size').onChange(restartAnimation);
+        gui.addColor(config, 'lineColor').name('Line Color').onChange(restartAnimation);
+        gui.addColor(config, 'particleColor').name('Particle Color').onChange(restartAnimation);
+        gui.add(config, 'lineOpacity', 0, 1, 0.01).name('Line Opacity').onChange(restartAnimation);
+        gui.add(config, 'oscillationFreq', 0.1, 2, 0.1).name('Oscillation Frequency').onChange(restartAnimation);
+        gui.add(config, 'maxConnected', 1, 20, 1).name('Max Connected Particles').onChange(restartAnimation);
+        gui.add(config, 'armCount', 1, 30, 1).name('Arm Thickness').onChange(restartAnimation);
+        gui.add(config, 'reset').name('Reset Defaults');
+
+        // Initialize spiders
+        restartAnimation();
+
+        window.addEventListener('pointermove', (e) => {
+            spiders.forEach(spider => {
+                spider.follow(e.clientX, e.clientY);
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            camera.left = window.innerWidth / -2;
+            camera.right = window.innerWidth / 2;
+            camera.top = window.innerHeight / 2;
+            camera.bottom = window.innerHeight / -2;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate(t) {
+            scene.children = scene.children.filter(child => !(child instanceof THREE.Line));
+            renderer.setClearColor(0x000000);
+            renderer.clear();
+            t /= 1000;
+            spiders.forEach(spider => spider.tick(t));
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
