@@ -4,7 +4,8 @@ export default {
         input: {
           main: './index.html',
           second: './second.html',
-          third: './third.html'
+          third: './third.html',
+          jelly: './jelly.html'
         }
       }
     }
